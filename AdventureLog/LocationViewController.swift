@@ -403,6 +403,7 @@ class LocationViewController: UIViewController, UITableViewDelegate, UITableView
         if self.locationManager.authorizationStatus == .authorizedWhenInUse {
             print("Location is authorized!");
             locationManager.startUpdatingLocation();
+            usleep(2000000);
             return self.locationManager.location;
         }
         else if self.locationManager.authorizationStatus == .denied || self.locationManager.authorizationStatus == .restricted {
@@ -423,21 +424,15 @@ class LocationViewController: UIViewController, UITableViewDelegate, UITableView
         
         searchString += "term=" + term;
         
-        do {
-            try searchString += "&latitude=" + String((CURRENT_LOCATION?.coordinate.latitude)!);
-            try searchString += "&longitude=" + String((CURRENT_LOCATION?.coordinate.longitude)!);
+        if CURRENT_LOCATION?.coordinate.latitude != nil {
+            searchString += "&latitude=" + String((CURRENT_LOCATION?.coordinate.latitude)!);
+            searchString += "&longitude=" + String((CURRENT_LOCATION?.coordinate.longitude)!);
         }
-        catch {
-            CURRENT_LOCATION = locationManager.location;
-            do {
-                try searchString += "&latitude=" + String((CURRENT_LOCATION?.coordinate.latitude)!);
-                try searchString += "&longitude=" + String((CURRENT_LOCATION?.coordinate.longitude)!);
-            }
-            catch {
-                searchString += "&latitude=" + String(33.4484); // IF FAILS TWICE LOOK UP LOCATIONS IN PHOENIX
-                searchString += "&longitude=" + String(-112.0740); // IF FAILS TWICE LOOK UP LOCATION IN PHOENIX
-            }
+        else {
+            searchString += "&latitude=" + String(33.4484);
+            searchString += "&longitude=" + String(-112.0740);
         }
+        
         searchString += "&radius=40000";
         
         if size <= 50{
