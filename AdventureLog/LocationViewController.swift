@@ -120,30 +120,6 @@ class LocationViewController: UIViewController, UITableViewDelegate, UITableView
     override func viewDidLoad() {
         super.viewDidLoad()
         
-        //MOCK
-//        let mocklocation = Location(context: searchManagedObjectContext);
-//        mocklocation.setValue("Sippy Sips Coffee", forKey: "name");
-//        mocklocation.setValue("500 E University Dr, Tempe AZ, 85281", forKey: "address");
-//        mocklocation.setValue("Tempe", forKey: "city");
-//        mocklocation.setValue("Coffee", forKey: "type");
-//        mocklocation.setValue(33.4255, forKey: "latitude");
-//        mocklocation.setValue(-111.9400, forKey: "longitude");
-//        mocklocation.setValue(false, forKey: "liked");
-//        mocklocation.setValue("yelp-123", forKey: "yelpBusinessId");
-
-//        let mocklocation2 = Location(context: savedManagedObjectContext);
-//        mocklocation2.setValue("Star Wars Coffee", forKey: "name");
-//        mocklocation2.setValue("123 Ez Street, Tempe, AZ 12345", forKey: "address");
-//        mocklocation2.setValue("Tempe", forKey: "city");
-//        mocklocation2.setValue("Coffee", forKey: "type");
-//        mocklocation2.setValue(40.7128, forKey: "latitude");
-//        mocklocation2.setValue(-74.0060, forKey: "longitude");
-//        mocklocation2.setValue(true, forKey: "liked");
-//        mocklocation2.setValue("yelp-234", forKey: "yelpBusinessId");
-
-//        searchLocations.add(loc: mocklocation);
-        //MOCK
-        
         locationManager.delegate = self;
         
         print("Requesting location authorization");
@@ -153,12 +129,11 @@ class LocationViewController: UIViewController, UITableViewDelegate, UITableView
             CURRENT_LOCATION = getCurrentLocation();
             self.savedLocations.Locations = getLikesFromCoreData();
             callYelpApi();
-            Table.reloadData();
+            
         }
         
         savedTableView.delegate = self;
         savedTableView.dataSource = self;
-        
         self.setUpExploreMode();
         
     }
@@ -206,6 +181,11 @@ class LocationViewController: UIViewController, UITableViewDelegate, UITableView
     override func prepare(for seg: UIStoryboardSegue, sender: Any?) {
         
         if seg.identifier == "toGenerator" {
+            
+            if let vc = seg.destination as? GeneratorViewController{
+                vc.savedLocations = self.savedLocations.Locations;
+                vc.searchLocations = self.searchLocations.Locations;
+            }
             
         }
         else if seg.identifier == "toDetailsFromRandomGeneratorView"{
@@ -360,7 +340,6 @@ class LocationViewController: UIViewController, UITableViewDelegate, UITableView
         if TABLE_MODE == EXPLORE_MODE {
             self.searchTableView = self.Table
             self.TABLE_MODE = SAVED_MODE;
-//            print("Table Mode: Saved Mode");
             setUpSavedMode();
         }
         else if TABLE_MODE == SEARCH_BAR_MODE {
@@ -370,7 +349,6 @@ class LocationViewController: UIViewController, UITableViewDelegate, UITableView
         else {
             self.savedTableView = Table;
             self.TABLE_MODE = EXPLORE_MODE;
-//            print("Table Mode: Explore Mode");
             setUpExploreMode();
         }
         
@@ -499,7 +477,6 @@ class LocationViewController: UIViewController, UITableViewDelegate, UITableView
                         loc.address = "Address not found";
                     }
                     
-                    
                     let coords = obj["coordinates"] as! [String : NSNumber];
                     loc.latitude = (coords["latitude"])?.floatValue ?? 0;
                     loc.longitude = (coords["longitude"])?.floatValue ?? 0;
@@ -511,15 +488,11 @@ class LocationViewController: UIViewController, UITableViewDelegate, UITableView
                     self.searchLocations.add(loc: loc);
                     
                 }
-                
-                
+                DispatchQueue.main.async {
+                    self.Table.reloadData();
+                }
             }
-            
         }).resume();
-    }
-    
-    func processObject(){
-        
     }
     
 }
