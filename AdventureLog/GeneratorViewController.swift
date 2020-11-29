@@ -67,17 +67,20 @@ class GeneratorViewController: UIViewController {
             }
         }
     }
-    @IBAction func onClickButton(_ sender: Any) {
-        var lo:Location = findFood()!;
-        
-        
+
+    
+    override func prepare(for seg: UIStoryboardSegue, sender: Any?) {
+        if seg.identifier == "toDetailsFromGenerator" {
+            if let vc = seg.destination as? LocationDetailsViewController {
+                vc.location = findFood();
+            }
+            
+        }
     }
     
     override func viewDidLoad() {
         super.viewDidLoad()
         // Do any additional setup after loading the view.
     }
-    
-    @IBAction func passback(seg: UIStoryboardSegue){}
 
 }

@@ -9,7 +9,7 @@ import Foundation
 import UIKit
 import MapKit
 
-class LocationDetailsViewController: UIViewController {
+class LocationDetailsViewController: UIViewController, UIImagePickerControllerDelegate & UINavigationControllerDelegate {
 
     // Constants for the ui
     let VISITED_MESSAGE = "You have visited here!";
@@ -29,10 +29,10 @@ class LocationDetailsViewController: UIViewController {
     @IBOutlet weak var visitedLabel: UILabel!
     @IBOutlet weak var visitedButton: UIButton!
     @IBOutlet weak var notesArea: UITextView!
-    
     @IBOutlet weak var likeButton: UIButton!
     @IBOutlet weak var unlikeButton: UIButton!
-    
+    let picker = UIImagePickerController();
+
     override func viewDidLoad() {
         super.viewDidLoad()
         // Do any additional setup after loading the view.
@@ -59,6 +59,8 @@ class LocationDetailsViewController: UIViewController {
         }
         
         handleGeo();
+        
+        picker.delegate = self;
         
     }
     
@@ -91,7 +93,26 @@ class LocationDetailsViewController: UIViewController {
     }
     
     @IBAction func addPhotoAction(_ sender: Any) {
-        //TODO ADD POPUP
+        let alert = UIAlertController(title: "Add A Photo", message: "Which device would you like to use?", preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: NSLocalizedString("Photo Library", comment: "Default action"), style: .default, handler: { _ in
+            self.picker.allowsEditing = false
+            self.picker.sourceType = .photoLibrary
+            self.picker.mediaTypes = UIImagePickerController.availableMediaTypes(for: .photoLibrary)!
+            self.picker.modalPresentationStyle = .popover
+            self.present(self.picker, animated: true, completion: nil)
+        }))
+        alert.addAction(UIAlertAction(title: NSLocalizedString("Camera", comment: "Default action"), style: .default, handler: { _ in
+            if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                self.picker.allowsEditing = false
+                self.picker.sourceType = UIImagePickerController.SourceType.camera
+                self.picker.cameraCaptureMode = .photo
+                self.picker.modalPresentationStyle = .fullScreen
+                self.present(self.picker,animated: true,completion: nil)
+            } else {
+                print("No camera")
+            }
+        }))
+        self.present(alert, animated: true, completion: nil)
     }
     
     func toggleLikeButton(){
@@ -198,5 +219,31 @@ class LocationDetailsViewController: UIViewController {
             }
         })
     }
+    
+    //MARK: - Delegates
+    func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]){
+        // Local variable inserted by Swift 4.2 migrator.
+        let info = convertFromUIImagePickerControllerInfoKeyDictionary(info)
+
+        picker .dismiss(animated: true, completion: nil)
+        self.location?.photos = (info[convertFromUIImagePickerControllerInfoKey(UIImagePickerController.InfoKey.originalImage)] as? UIImage)!.pngData();
+        self.photos.image = (info[convertFromUIImagePickerControllerInfoKey(UIImagePickerController.InfoKey.originalImage)] as? UIImage)!;
+        
+    }
+    
+    // Helper function inserted by Swift 4.2 migrator.
+    fileprivate func convertFromUIImagePickerControllerInfoKeyDictionary(_ input: [UIImagePickerController.InfoKey: Any]) -> [String: Any] {
+        return Dictionary(uniqueKeysWithValues: input.map {key, value in (key.rawValue, value)})
+    }
+
+    // Helper function inserted by Swift 4.2 migrator.
+    fileprivate func convertFromUIImagePickerControllerInfoKey(_ input: UIImagePickerController.InfoKey) -> String {
+        return input.rawValue
+    }
+    
+    func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+        dismiss(animated: true, completion: nil)
+    }
+    
     
 }

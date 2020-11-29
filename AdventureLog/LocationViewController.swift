@@ -104,11 +104,8 @@ class LocationViewController: UIViewController, UITableViewDelegate, UITableView
     @IBOutlet weak var tableModeSelector: UISegmentedControl!
     
     @IBOutlet weak var searchTableView: UITableView!
-    @IBOutlet weak var searchView: UIView!
     
     @IBOutlet weak var savedTableView: UITableView!
-    
-    @IBOutlet weak var searchBar: UITextField!
     
     let savedManagedObjectContext = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext;
     let searchManagedObjectContext = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext;
@@ -218,7 +215,13 @@ class LocationViewController: UIViewController, UITableViewDelegate, UITableView
     
     @IBAction func passback(seg: UIStoryboardSegue){
         if seg.source is GeneratorViewController {
-            
+            if seg.destination is LocationViewController{
+                print("Passback generator -> location View");
+                let vc = seg.source as! GeneratorViewController;
+                self.savedLocations.Locations = vc.savedLocations!;
+                saveLikesToCoreData();
+                self.setUpExploreMode();
+            }
             
         }
         else if seg.source is LocationDetailsViewController {
@@ -249,7 +252,24 @@ class LocationViewController: UIViewController, UITableViewDelegate, UITableView
                 
             }
             else if seg.destination is GeneratorViewController {
-                
+                if seg.source is LocationDetailsViewController {
+                    let src = seg.source as! LocationDetailsViewController;
+                    let dest = seg.destination as! GeneratorViewController;
+                    let loc = src.location;
+                    
+                    var locs = LocationList();
+                    locs.Locations = dest.savedLocations!;
+                    
+                    if loc?.liked == true {
+                        locs.add(loc: loc!);
+                    }
+                    else {
+                        locs.delete(loc: loc!);
+                    }
+                    
+                    dest.savedLocations = locs.Locations;
+                    
+                }
             }
         }
     }
@@ -308,13 +328,14 @@ class LocationViewController: UIViewController, UITableViewDelegate, UITableView
     }
     
     func setUpExploreMode(){
+        TABLE_MODE = EXPLORE_MODE;
         savedTableView.delegate = nil;
         savedTableView.dataSource = nil;
         searchTableView.delegate = self;
         searchTableView.dataSource = self;
         
         self.tableModeSelector.selectedSegmentIndex = 0;
-        self.searchView.isHidden = false;
+        
         self.searchTableView.isHidden = false;
         self.savedTableView.isHidden = true;
         Table = searchTableView;
@@ -322,13 +343,13 @@ class LocationViewController: UIViewController, UITableViewDelegate, UITableView
     }
     
     func setUpSavedMode(){
+        TABLE_MODE = SAVED_MODE;
         savedTableView.delegate = self;
         savedTableView.dataSource = self;
         searchTableView.delegate = nil;
         searchTableView.dataSource = nil;
         
         self.tableModeSelector.selectedSegmentIndex = 1;
-        self.searchView.isHidden = false;
         self.searchTableView.isHidden = true;
         self.savedTableView.isHidden = false;
         Table = savedTableView;
@@ -350,21 +371,6 @@ class LocationViewController: UIViewController, UITableViewDelegate, UITableView
             self.savedTableView = Table;
             self.TABLE_MODE = EXPLORE_MODE;
             setUpExploreMode();
-        }
-        
-    }
-    
-    @IBAction func editingEnded(_ sender: Any) {
-        if searchBar.text?.count == 0 && TABLE_MODE == SEARCH_BAR_MODE{
-            self.switchTableMode(self);
-        }
-        
-        
-    }
-    
-    @IBAction func search(_ sender: Any) {
-        if searchBar.text?.count == 0 && TABLE_MODE == SEARCH_BAR_MODE{
-            self.switchTableMode(self);
         }
         
     }
@@ -448,11 +454,7 @@ class LocationViewController: UIViewController, UITableViewDelegate, UITableView
                 let list = json!["businesses"] as! NSArray;
                 
                 for x in list {
-                    
                     let obj = x as! [String: Any];
-                    print(obj["name"] as! String);
-                    
-                    
                     var loc = Location(context: self.searchManagedObjectContext);
                     loc.name = obj["name"] as? String;
                     loc.yelpBusinessId = obj["id"] as? String;

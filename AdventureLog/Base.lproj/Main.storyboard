@@ -212,7 +212,7 @@
                                     <color key="titleColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
                                 </state>
                                 <connections>
-                                    <action selector="onClickButton:" destination="2ZF-nK-nUl" eventType="touchUpInside" id="uQX-fd-JLL"/>
+                                    <segue destination="Vvr-4w-ItO" kind="presentation" identifier="toDetailsFromGenerator" modalPresentationStyle="fullScreen" id="zzg-Kc-ed5"/>
                                 </connections>
                             </button>
                             <button opaque="NO" contentMode="scaleToFill" fixedFrame="YES" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="system" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="Cxa-T9-QI8">
@@ -425,7 +425,7 @@
         </scene>
     </scenes>
     <inferredMetricsTieBreakers>
-        <segue reference="L9s-9d-LPR"/>
+        <segue reference="zzg-Kc-ed5"/>
     </inferredMetricsTieBreakers>
     <resources>
         <systemColor name="labelColor">
