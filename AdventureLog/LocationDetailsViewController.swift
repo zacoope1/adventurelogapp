@@ -38,7 +38,7 @@ class LocationDetailsViewController: UIViewController, UIImagePickerControllerDe
         // Do any additional setup after loading the view.
         switchMode(self);
         toggleLikeButton();
-        self.photos.image = UIImage(named: "Food.jpeg");
+        self.photos.image = UIImage(data: (self.location?.photos)!);
         name.text = location?.name;
         address.text = location?.address;
         

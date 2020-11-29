@@ -22,17 +22,16 @@ class LocationViewController: UIViewController, UITableViewDelegate, UITableView
     let SAVED_MODE = 1;
     let SEARCH_BAR_MODE = 2;
     var TABLE_MODE:Int = 0; //Starts in explore
+    var SHOULD_SEGUE_PERFORM = false;
     // TABLE MODE
     
     
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         
         if TABLE_MODE == EXPLORE_MODE{
-//            print("Entries of searchLocations: " + String(searchLocations.size()));
             return searchLocations.size();
         }
         else {
-//            print("Entries of savedLocations: " + String(savedLocations.size()));
             return savedLocations.size();
         }
         
@@ -43,7 +42,6 @@ class LocationViewController: UIViewController, UITableViewDelegate, UITableView
         let cell = tableView.dequeueReusableCell(withIdentifier: "LocationCell", for: indexPath) as! LocationCell;
         
         if TABLE_MODE == EXPLORE_MODE{
-//            print("Setting cells for searchLocations");
             let loc = searchLocations.getLocations()[indexPath.row];
             cell.loc = loc;
             cell.name.text = loc.name;
@@ -51,7 +49,6 @@ class LocationViewController: UIViewController, UITableViewDelegate, UITableView
             cell.city.text = loc.city;
         }
         else {
-//            print("Setting cells for savedLocations");
             let loc = savedLocations.getLocations()[indexPath.row];
             cell.loc = loc;
             cell.name.text = loc.name;
@@ -122,16 +119,17 @@ class LocationViewController: UIViewController, UITableViewDelegate, UITableView
         print("Requesting location authorization");
         self.locationManager.requestWhenInUseAuthorization();
         
+        
+        
         if !(locationManager.authorizationStatus == .notDetermined || locationManager.authorizationStatus == .restricted || locationManager.authorizationStatus == .denied) {
+            SHOULD_SEGUE_PERFORM = true;
             CURRENT_LOCATION = getCurrentLocation();
             self.savedLocations.Locations = getLikesFromCoreData();
             callYelpApi();
-            
+            savedTableView.delegate = self;
+            savedTableView.dataSource = self;
+            self.setUpExploreMode();
         }
-        
-        savedTableView.delegate = self;
-        savedTableView.dataSource = self;
-        self.setUpExploreMode();
         
     }
     
@@ -154,10 +152,10 @@ class LocationViewController: UIViewController, UITableViewDelegate, UITableView
         switch status{
         case .restricted, .denied:
             print("You chose to disable location! This app will not work without location.");
-            exit(0);
             break;
         case .authorizedAlways, .authorizedWhenInUse:
             print("Authorized!");
+            SHOULD_SEGUE_PERFORM = true;
             runAppSetup();
             callYelpApi();
             Table.reloadData();
@@ -174,6 +172,23 @@ class LocationViewController: UIViewController, UITableViewDelegate, UITableView
         }
     }
 
+    override func shouldPerformSegue(withIdentifier identifier: String, sender: Any?) -> Bool {
+        if identifier == "toGenerator"{
+            if SHOULD_SEGUE_PERFORM {
+                return true;
+            }
+            else {
+                print("Location is not authorized! This app will not work properly. Please run a full reset on the app to be prompted for location authorization again!");
+                let alert = UIAlertController(title: "location is not authorized", message: "Please run a full reset on the app to be prompted for location authorization again!", preferredStyle: .alert)
+                alert.addAction(UIAlertAction(title: NSLocalizedString("OK", comment: "Default action"), style: .default, handler: { _ in NSLog("The \"OK\" alert occured.")}))
+                self.present(alert, animated: true, completion: nil)
+                return false;
+            }
+        }
+        else{
+            return true;
+        }
+    }
     
     override func prepare(for seg: UIStoryboardSegue, sender: Any?) {
         
@@ -216,7 +231,6 @@ class LocationViewController: UIViewController, UITableViewDelegate, UITableView
     @IBAction func passback(seg: UIStoryboardSegue){
         if seg.source is GeneratorViewController {
             if seg.destination is LocationViewController{
-                print("Passback generator -> location View");
                 let vc = seg.source as! GeneratorViewController;
                 self.savedLocations.Locations = vc.savedLocations!;
                 saveLikesToCoreData();
@@ -358,6 +372,15 @@ class LocationViewController: UIViewController, UITableViewDelegate, UITableView
     
     @IBAction func switchTableMode(_ sender: Any) {
         
+        if !SHOULD_SEGUE_PERFORM {
+            self.tableModeSelector.selectedSegmentIndex = 0;
+            print("Location is not authorized! This app will not work properly. Please run a full reset on the app to be prompted for location authorization again!");
+            let alert = UIAlertController(title: "location is not authorized", message: "Please run a full reset on the app to be prompted for location authorization again!", preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: NSLocalizedString("OK", comment: "Default action"), style: .default, handler: { _ in NSLog("The \"OK\" alert occured.")}))
+            self.present(alert, animated: true, completion: nil)
+            return;
+        }
+        
         if TABLE_MODE == EXPLORE_MODE {
             self.searchTableView = self.Table
             self.TABLE_MODE = SAVED_MODE;
@@ -380,7 +403,6 @@ class LocationViewController: UIViewController, UITableViewDelegate, UITableView
         if self.locationManager.authorizationStatus == .authorizedWhenInUse {
             print("Location is authorized!");
             locationManager.startUpdatingLocation();
-            print(locationManager.location!);
             return self.locationManager.location;
         }
         else if self.locationManager.authorizationStatus == .denied || self.locationManager.authorizationStatus == .restricted {
@@ -400,8 +422,22 @@ class LocationViewController: UIViewController, UITableViewDelegate, UITableView
         var searchString = YELP_API_ENDPOINT + "?";
         
         searchString += "term=" + term;
-        searchString += "&latitude=" + String((CURRENT_LOCATION?.coordinate.latitude)!);
-        searchString += "&longitude=" + String((CURRENT_LOCATION?.coordinate.longitude)!);
+        
+        do {
+            try searchString += "&latitude=" + String((CURRENT_LOCATION?.coordinate.latitude)!);
+            try searchString += "&longitude=" + String((CURRENT_LOCATION?.coordinate.longitude)!);
+        }
+        catch {
+            CURRENT_LOCATION = locationManager.location;
+            do {
+                try searchString += "&latitude=" + String((CURRENT_LOCATION?.coordinate.latitude)!);
+                try searchString += "&longitude=" + String((CURRENT_LOCATION?.coordinate.longitude)!);
+            }
+            catch {
+                searchString += "&latitude=" + String(33.4484); // IF FAILS TWICE LOOK UP LOCATIONS IN PHOENIX
+                searchString += "&longitude=" + String(-112.0740); // IF FAILS TWICE LOOK UP LOCATION IN PHOENIX
+            }
+        }
         searchString += "&radius=40000";
         
         if size <= 50{
@@ -486,7 +522,7 @@ class LocationViewController: UIViewController, UITableViewDelegate, UITableView
                     loc.liked = false;
                     loc.visited = "no";
                     loc.type = type;
-                    loc.photos = Data();
+                    loc.photos = UIImage(named: "Food.jpeg")?.pngData();
                     self.searchLocations.add(loc: loc);
                     
                 }
