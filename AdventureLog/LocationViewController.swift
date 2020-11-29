@@ -6,9 +6,16 @@
 //
 
 import UIKit
-import CoreData;
+import CoreData
+import CoreLocation
 
-class LocationViewController: UIViewController, UITableViewDelegate, UITableViewDataSource {
+class LocationViewController: UIViewController, UITableViewDelegate, UITableViewDataSource, CLLocationManagerDelegate {
+    
+    let YELP_API_AUTHORIZATION_HEADER = "Bearer qu3k-y909KY2xCG-a4TZfOloGUktuyWoHq9kyGukPaxzSEyCLyil6RIfElU0vk_rdHBptITc4lc5HNf45u3iLxINKUg3449qL0E8_PJKvkQGAbC9oNOreMJNBau9X3Yx";
+    let YELP_API_ENDPOINT = "https://api.yelp.com/v3/businesses/search"; // MUST ADD "?" for params
+    
+    var CURRENT_LOCATION: CLLocation?;
+    var locationManager:CLLocationManager = CLLocationManager();
     
     // TABLE MODE
     let EXPLORE_MODE = 0;
@@ -137,14 +144,62 @@ class LocationViewController: UIViewController, UITableViewDelegate, UITableView
 //        searchLocations.add(loc: mocklocation);
         //MOCK
         
-        self.savedLocations.Locations = getLikesFromCoreData();
+        locationManager.delegate = self;
         
+        print("Requesting location authorization");
+        self.locationManager.requestWhenInUseAuthorization();
+        
+        if !(locationManager.authorizationStatus == .notDetermined || locationManager.authorizationStatus == .restricted || locationManager.authorizationStatus == .denied) {
+            CURRENT_LOCATION = getCurrentLocation();
+            self.savedLocations.Locations = getLikesFromCoreData();
+            callYelpApi();
+            Table.reloadData();
+        }
         
         savedTableView.delegate = self;
         savedTableView.dataSource = self;
         
         self.setUpExploreMode();
         
+    }
+    
+    func runAppSetup(){
+        print("Running app setup!");
+        
+        CURRENT_LOCATION = getCurrentLocation();
+    
+        self.savedLocations.Locations = getLikesFromCoreData();
+        
+        savedTableView.delegate = self;
+        savedTableView.dataSource = self;
+        
+        self.setUpExploreMode();
+        
+        print("App setup done!");
+    }
+    
+    func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus){
+        switch status{
+        case .restricted, .denied:
+            print("You chose to disable location! This app will not work without location.");
+            exit(0);
+            break;
+        case .authorizedAlways, .authorizedWhenInUse:
+            print("Authorized!");
+            runAppSetup();
+            callYelpApi();
+            Table.reloadData();
+            break;
+        case .notDetermined:
+            print("Asking again!");
+            self.locationManager.requestWhenInUseAuthorization();
+            break;
+        default:
+            print("Asking again!");
+            self.locationManager.requestWhenInUseAuthorization();
+            break;
+        
+        }
     }
 
     
@@ -227,7 +282,7 @@ class LocationViewController: UIViewController, UITableViewDelegate, UITableView
         
         if results != nil {
             results = filterResults(res: results!);
-            print("Returned \(results!.count) results");
+            print("Returned \(results!.count) results from core data!");
             return results!
         }
         else {
@@ -333,6 +388,137 @@ class LocationViewController: UIViewController, UITableViewDelegate, UITableView
         if searchBar.text?.count == 0 && TABLE_MODE == SEARCH_BAR_MODE{
             self.switchTableMode(self);
         }
+        
+    }
+    
+    func getCurrentLocation() -> CLLocation? {
+        
+        if self.locationManager.authorizationStatus == .authorizedWhenInUse {
+            print("Location is authorized!");
+            locationManager.startUpdatingLocation();
+            print(locationManager.location!);
+            return self.locationManager.location;
+        }
+        else if self.locationManager.authorizationStatus == .denied || self.locationManager.authorizationStatus == .restricted {
+            print("Location is not authorized! This app will not work properly. Please run a full reset on the app to be prompted for location authorization again!");
+            let alert = UIAlertController(title: "location is not authorized", message: "Please run a full reset on the app to be prompted for location authorization again!", preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: NSLocalizedString("OK", comment: "Default action"), style: .default, handler: { _ in NSLog("The \"OK\" alert occured.")}))
+            self.present(alert, animated: true, completion: nil)
+        }
+        else {
+            print("Location not found!");
+        }
+        
+        return nil;
+    }
+    
+    func getSearchString(term:String, size:Int) -> String {
+        var searchString = YELP_API_ENDPOINT + "?";
+        
+        searchString += "term=" + term;
+        searchString += "&latitude=" + String((CURRENT_LOCATION?.coordinate.latitude)!);
+        searchString += "&longitude=" + String((CURRENT_LOCATION?.coordinate.longitude)!);
+        searchString += "&radius=40000";
+        
+        if size <= 50{
+            searchString += "&limit=" + String(size);
+        }
+        else {
+            searchString += "&limit=30";
+        }
+
+        return searchString;
+    }
+    
+    func callYelpApi() {
+        
+        if CURRENT_LOCATION == nil {
+            if (locationManager.authorizationStatus == .denied || locationManager.authorizationStatus == .restricted) {
+                print("Location is nil. Returning empty list of locations.");
+            }
+        }
+        
+        let searchStringFood = URL(string: getSearchString(term: "food", size:30));
+        doApiCall(URL: searchStringFood!, type: "Restaurant");
+        
+        let searchStringCoffee = URL(string: getSearchString(term: "coffee", size:20));
+        doApiCall(URL: searchStringCoffee!, type: "Coffee and Tea");
+
+        let searchStringBar = URL(string: getSearchString(term: "bar", size:20));
+        doApiCall(URL: searchStringBar!, type: "Bar and Restaurant");
+        
+    }
+    
+    func doApiCall(URL: URL, type: String) {
+        var arr:[Location] = [];
+        print("Making Api call with string: " + URL.absoluteString);
+        
+        var session = URLSession.shared;
+        var request = URLRequest(url: URL);
+        request.setValue("application/json", forHTTPHeaderField: "Accept");
+        request.setValue(YELP_API_AUTHORIZATION_HEADER, forHTTPHeaderField: "Authorization");
+
+        let apiCall = session.dataTask(with: request, completionHandler: { [self] (data, res, err) in
+            
+            if err != nil{
+                print("Error gathering restaurant data")
+            }
+            else if let data = data {
+            
+                let json = try? JSONSerialization.jsonObject(with: data, options: []) as? NSDictionary;
+                
+                let list = json!["businesses"] as! NSArray;
+                
+                for x in list {
+                    
+                    let obj = x as! [String: Any];
+                    print(obj["name"] as! String);
+                    
+                    
+                    var loc = Location(context: self.searchManagedObjectContext);
+                    loc.name = obj["name"] as? String;
+                    loc.yelpBusinessId = obj["id"] as? String;
+                    let location = obj["location"] as? [String : Any];
+                    let city = location!["city"] as? String;
+                    loc.city = city;
+                    let address = location!["display_address"] as? [String];
+                    
+                    if address != nil {
+                        var addString = "";
+                        for x in address! {
+                            let arr = Array(x);
+                            let a = "" + String(arr[0]) + String(arr[1]) + String(arr[2]) + String(arr[3]);
+                            
+                            if !a.elementsEqual("Ste ") && !a.elementsEqual("ste ") {
+                                addString += x + " ";
+                            }
+                        }
+                        loc.address = addString
+                    }
+                    else {
+                        loc.address = "Address not found";
+                    }
+                    
+                    
+                    let coords = obj["coordinates"] as! [String : NSNumber];
+                    loc.latitude = (coords["latitude"])?.floatValue ?? 0;
+                    loc.longitude = (coords["longitude"])?.floatValue ?? 0;
+                    loc.notes = "";
+                    loc.liked = false;
+                    loc.visited = "no";
+                    loc.type = type;
+                    loc.photos = Data();
+                    self.searchLocations.add(loc: loc);
+                    
+                }
+                
+                
+            }
+            
+        }).resume();
+    }
+    
+    func processObject(){
         
     }
     
